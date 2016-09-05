@@ -16,12 +16,205 @@
 #
 import os
 import re
+import string
+import random
+import hashlib
+import hmac
 
 import webapp2
+from google.appengine.ext import db
 import jinja2
-import dbhelpers
-from handler import *
-from dbhelpers import User
+
+#   _____ _       _           _
+#  / ____| |     | |         | |
+# | |  __| | ___ | |__   __ _| |
+# | | |_ | |/ _ \| '_ \ / _` | |
+# | |__| | | (_) | |_) | (_| | |
+#  \_____|_|\___/|_.__/ \__,_|_|
+############################################################
+
+template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(template_dir), autoescape=True)
+
+BLOG_NAME = "Omar's Blog"
+
+SECRET = "nfyuBYUnuiGn*(^%@!jnd)aj8e!;kaHywsf-(2)124+_!"
+USER_RE = re.compile(r'^[a-zA-Z0-9_-]{3,20}$')
+PW_RE = re.compile(r'^.{3,20}$')
+EMAIL_RE = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
+
+
+def make_salt():
+    """Create salt"""
+    return ''.join(random.choice(string.letters) for x in xrange(5))
+
+
+def make_secure_val(val):
+    """Return secure value of a string"""
+    return '%s|%s' % (val, hmac.new(SECRET, val).hexdigest())
+
+
+def check_secure_val(secure_val):
+    """Check if secure value is valid"""
+    val = secure_val.split('|')[0]
+    if secure_val == make_secure_val(val):
+        return val
+
+
+def make_pw_hash(username, pw, salt=None):
+    """Return hashed password for a user"""
+    if not salt:
+        salt = make_salt()
+    h = hashlib.sha256(username + pw + salt).hexdigest()
+    return '%s|%s' % (h, salt)
+
+
+def valid_pw_hash(username, pw, h):
+    """Check if hash is valid for a user"""
+    salt = h.split('|')[1]
+    return h == make_pw_hash(username, pw, salt)
+
+
+def is_username_valid(username):
+    """Return true if username format is valid"""
+    return username and USER_RE.match(username)
+
+
+def is_pw_valid(pw):
+    """Return true if password format is valid"""
+    return pw and PW_RE.match(pw)
+
+
+def is_email_valid(email):
+    """Return true if email format is valid"""
+    return email and EMAIL_RE.match(email)
+
+
+def validate_username(username):
+    """Return error string if username is not valid"""
+    if not username:
+        return "No username"
+    elif not is_username_valid(username):
+        return "Username is not valid"
+
+
+def validate_pw(pw, pw_ver=None):
+    """Return error string if password is not valid"""
+    if pw and pw_ver and pw != pw_ver:
+        return "Passwords don't match"
+    elif not pw:
+        return "No password"
+    elif not is_pw_valid(pw):
+        return "Password is not valid"
+
+
+def validate_email(email):
+    """Return error string if email is not valid"""
+    if not is_email_valid(email):
+        return "Email is not valid"
+
+
+#  _    _                 _ _
+# | |  | |               | | |
+# | |__| | __ _ _ __   __| | | ___ _ __
+# |  __  |/ _` | '_ \ / _` | |/ _ \ '__|
+# | |  | | (_| | | | | (_| | |  __/ |
+# |_|  |_|\__,_|_| |_|\__,_|_|\___|_|
+############################################################
+class Handler(webapp2.RequestHandler):
+
+    def write(self, *a, **kw):
+        """Write to response"""
+        self.response.write(*a, **kw)
+
+    def render_str(self, template, **params):
+        """Render a string"""
+        t = jinja_env.get_template(template)
+        return t.render(params)
+
+    def render(self, template, **kw):
+        """Render a template"""
+        self.write(self.render_str(template, **kw))
+        
+    def initialize(self, *a, **kw):
+        webapp2.RequestHandler.initialize(self, *a, **kw)
+        user_id = self.read_secure_cookie('user_id')
+        self.user = user_id and User.by_id(int(user_id))
+        self.brand = BLOG_NAME
+
+    def render_main(self):
+        """Render homepage"""
+        self.render("index.html", user=self.user, brand=self.brand)
+
+    def render_login(self, username=None,
+                     username_error=None, pw_error=None, error=None):
+        """Render login page"""
+        self.render("login.html", username=username,
+                    username_error=username_error, pw_error=pw_error,
+                    error=error, user=self.user, brand=self.brand)
+
+    def render_sign_up(self, username=None, pw=None, email=None,
+                       username_error=None, pw_error=None, email_error=None,
+                       error=None):
+               """Render sign up page"""
+               self.render("signup.html", username=username, pw=pw,
+                           email=email, username_error=username_error,
+                           pw_error=pw_error, email_error=email_error,
+                           error=error, user=self.user, brand=self.brand)
+
+    def set_secure_cookie(self, name, value):
+        """Set a hashed cookie with a name and a value"""
+        cookie_val = make_secure_val(value)
+        self.response.headers.add_header(
+            'Set-Cookie',
+            '%s=%s; Path=/' % (name, cookie_val))
+
+    def read_secure_cookie(self, name):
+        """Read a hashed cookie of a name"""
+        cookie_val = self.request.cookies.get(name)
+        return cookie_val and check_secure_val(cookie_val)
+
+    def sign_up(self, username, pw, email=None):
+        if not User.by_username(username):
+            pw_hash = make_pw_hash(username, pw)
+            u = User(
+                parent=users_key(),
+                username=username,
+                pw_hash=pw_hash,
+                email=email
+            )
+            u.put()
+            self.set_secure_cookie('user_id', str(u.key().id()))
+            return u
+        else:
+            return None
+
+    def login(self, username, pw):
+        u = User.by_username(username)
+        if u and valid_pw_hash(username, pw, u.pw_hash):
+            self.set_secure_cookie('user_id', str(u.key().id()))
+            return u
+        else:
+            return None
+
+    def logout(self):
+        self.response.headers.add_header('Set-Cookie', 'user_id=; Path=/')
+
+############################################################
+############################################################
+
+
+
+#  _____                      
+# |  __ \                     
+# | |__) |_ _  __ _  ___  ___ 
+# |  ___/ _` |/ _` |/ _ \/ __|
+# | |  | (_| | (_| |  __/\__ \
+# |_|   \__,_|\__, |\___||___/
+#              __/ |          
+#             |___/        
+############################################################
 
 
 class MainPage(Handler):
@@ -29,10 +222,14 @@ class MainPage(Handler):
     def get(self):
         self.render_main()
 
+
 class LoginPage(Handler):
 
     def get(self):
-        self.render_login()
+        if self.user:
+            self.redirect("/")
+        else:
+            self.render_login()
 
     def post(self):
         username = self.request.get('username')
@@ -41,11 +238,12 @@ class LoginPage(Handler):
         pw_error = validate_pw(pw)
 
         if not (username_error or pw_error):
-            u = User.login(username, pw)
+            u = self.login(username, pw)
             if u:
-                self.write("Success")
+                self.redirect("/")
             else:
-                self.render_login(username, username_error, pw_error, "Invalid username and/or password")
+                self.render_login(username, username_error,
+                                  pw_error, "Invalid username and/or password")
         else:
             self.render_login(username, username_error, pw_error)
 
@@ -53,7 +251,10 @@ class LoginPage(Handler):
 class SignUpPage(Handler):
 
     def get(self):
-        self.render_sign_up()
+        if self.user:
+            self.redirect("/")
+        else:
+            self.render_sign_up()
 
     def post(self):
         username = self.request.get('username')
@@ -67,16 +268,54 @@ class SignUpPage(Handler):
             email_error = validate_email(email)
 
         if not (username_error or pw_error or email_error):
-            if User.by_username(username):
-                self.render_sign_up(username, pw, email, username_error, pw_error, email_error, "That user already exists!")
+            u = self.sign_up(username, pw, email)
+            if u:
+                self.redirect("/")
             else:
-                u = User.sign_up(username, pw, email)
-                u.put()
-                self.write("Success")
+                self.render_sign_up(username, pw, email, username_error,
+                                    pw_error, email_error, "That user already exists!")
         else:
-            self.render_sign_up(username, pw, email, username_error, pw_error, email_error)
+            self.render_sign_up(username, pw, email,
+                                username_error, pw_error, email_error)
 
+class LogoutPage(Handler):
+
+    def get(self):
+        self.logout()
+        self.redirect("/")
 
 app = webapp2.WSGIApplication([
-    ('/', MainPage), ('/login', LoginPage), ('/signup', SignUpPage)
+    ('/', MainPage),
+    ('/login', LoginPage),
+    ('/signup', SignUpPage),
+    ('/logout', LogoutPage)
 ], debug=True)
+
+############################################################
+############################################################
+
+
+
+#  _    _
+# | |  | |
+# | |  | |___  ___ _ __
+# | |  | / __|/ _ \ '__|
+# | |__| \__ \  __/ |
+#  \____/|___/\___|_|
+############################################################
+def users_key(group='default'):
+    return db.Key.from_path('users', group)
+
+
+class User(db.Model):
+    username = db.StringProperty(required=True)
+    pw_hash = db.StringProperty(required=True)
+    email = db.StringProperty()
+
+    @classmethod
+    def by_id(cls, uid):
+        return User.get_by_id(uid, parent=users_key())
+
+    @classmethod
+    def by_username(cls, username):
+        return User.all().filter('username =', username).get()
