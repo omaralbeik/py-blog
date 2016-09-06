@@ -3,10 +3,9 @@
 
 <head>
     <meta charset="utf-8">
-    <title>{{brand}}</title>
+    <title>New Post | {{brand}}</title>
     <link type="text/css" rel="stylesheet" href="/bootstrap/css/bootstrap.min.css">
     <link type="text/css" rel="stylesheet" href="/style/main.css">
-    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" type="text/css">
     <meta name="viewport" content="width=device-width,initial-scale=1">
 </head>
 
@@ -33,7 +32,7 @@
                 <ul class="nav navbar-nav navbar-right">
                     {% if user %}
                     <li><a href="/newpost">New Post<span class="sr-only">(current)</span></a></li>
-                    <li><a href="/myposts">My Post<span class="sr-only">(current)</span></a></li>
+                    <li class="active"><a href="#">My Post<span class="sr-only">(current)</span></a></li>
                     <li><a href="/logout">Logout<span class="sr-only">(current)</span></a></li>
                     {% else %}
                     <li><a href="/login">Login</a></li>
@@ -45,6 +44,7 @@
         </div>
         <!-- /.container-fluid -->
     </nav>
+
     {% if posts %}
     <div class="container">
         <div class="col-md-8 col-md-offset-2">
@@ -66,6 +66,8 @@
         </div>
     </div>
     {% endif %}
+
+
     <script src="js/jquery-3.1.0.min.js"></script>
     <script src="bootstrap/js/bootstrap.min.js"></script>
 

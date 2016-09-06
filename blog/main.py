@@ -25,6 +25,7 @@ import webapp2
 from google.appengine.ext import db
 import jinja2
 
+
 #   _____ _       _           _
 #  / ____| |     | |         | |
 # | |  __| | ___ | |__   __ _| |
@@ -136,16 +137,18 @@ class Handler(webapp2.RequestHandler):
     def render(self, template, **kw):
         """Render a template"""
         self.write(self.render_str(template, **kw))
-        
+
     def initialize(self, *a, **kw):
         webapp2.RequestHandler.initialize(self, *a, **kw)
         user_id = self.read_secure_cookie('user_id')
         self.user = user_id and User.by_id(int(user_id))
         self.brand = BLOG_NAME
 
-    def render_main(self):
+    def render_main(self, posts=None):
         """Render homepage"""
-        self.render("index.html", user=self.user, brand=self.brand)
+        if not posts:
+            posts = Post.all().order('-created')
+        self.render("index.html", user=self.user, brand=self.brand, posts=posts)
 
     def render_login(self, username=None,
                      username_error=None, pw_error=None, error=None):
@@ -162,6 +165,17 @@ class Handler(webapp2.RequestHandler):
                            email=email, username_error=username_error,
                            pw_error=pw_error, email_error=email_error,
                            error=error, user=self.user, brand=self.brand)
+
+    def render_new_post(self, title=None, body=None,
+                        title_error=None, body_error=None):
+        """Render new post page"""
+        self.render("newpost.html", user=self.user, brand=self.brand,
+                    title=title, body=body, title_error=title_error,
+                    body_error=body_error)
+
+    def render_my_posts(self):
+        """Render my posts page"""
+        self.render("myposts.html", user=self.user, brand=self.brand)
 
     def set_secure_cookie(self, name, value):
         """Set a hashed cookie with a name and a value"""
@@ -205,15 +219,14 @@ class Handler(webapp2.RequestHandler):
 ############################################################
 
 
-
-#  _____                      
-# |  __ \                     
-# | |__) |_ _  __ _  ___  ___ 
+#  _____
+# |  __ \
+# | |__) |_ _  __ _  ___  ___
 # |  ___/ _` |/ _` |/ _ \/ __|
 # | |  | (_| | (_| |  __/\__ \
 # |_|   \__,_|\__, |\___||___/
-#              __/ |          
-#             |___/        
+#              __/ |
+#             |___/
 ############################################################
 
 
@@ -263,9 +276,7 @@ class SignUpPage(Handler):
         email = self.request.get("email")
         username_error = validate_username(username)
         pw_error = validate_pw(pw, pw_ver)
-        email_error = ""
-        if email:
-            email_error = validate_email(email)
+        email_error = validate_email(email) if email else None
 
         if not (username_error or pw_error or email_error):
             u = self.sign_up(username, pw, email)
@@ -278,22 +289,59 @@ class SignUpPage(Handler):
             self.render_sign_up(username, pw, email,
                                 username_error, pw_error, email_error)
 
+
 class LogoutPage(Handler):
 
     def get(self):
         self.logout()
         self.redirect("/")
 
+
+class NewPostPage(Handler):
+
+    def get(self):
+        if self.user:
+            self.render_new_post()
+        else:
+            self.redirect("/login")
+
+    def post(self):
+        title = self.request.get('title')
+        body = self.request.get('body')
+        title_error = None if title else "Please enter a title"
+        body_error = None if body else "Please enter a body"
+
+        if title_error or body_error:
+            self.render_new_post(title=title, body=body,
+                                 title_error=title_error, body_error=body_error)
+        else:
+            user_id = self.user.key().id()
+            p = Post(parent=blog_key(), title=title,
+                     body=body, author_id=user_id)
+            p.put()
+            self.redirect("/")
+
+
+class MyPostsPage(Handler):
+
+    def get(self):
+        if self.user:
+            self.render_my_posts()
+        else:
+            self.redirect("/login")
+
+
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/login', LoginPage),
     ('/signup', SignUpPage),
-    ('/logout', LogoutPage)
+    ('/logout', LogoutPage),
+    ('/newpost', NewPostPage),
+    ('/myposts', MyPostsPage)
 ], debug=True)
 
 ############################################################
 ############################################################
-
 
 
 #  _    _
@@ -303,6 +351,7 @@ app = webapp2.WSGIApplication([
 # | |__| \__ \  __/ |
 #  \____/|___/\___|_|
 ############################################################
+
 def users_key(group='default'):
     return db.Key.from_path('users', group)
 
@@ -319,3 +368,54 @@ class User(db.Model):
     @classmethod
     def by_username(cls, username):
         return User.all().filter('username =', username).get()
+
+############################################################
+############################################################
+
+
+#  _____          _
+# |  __ \        | |
+# | |__) |__  ___| |_
+# |  ___/ _ \/ __| __|
+# | |  | (_) \__ \ |_
+# |_|   \___/|___/\__|
+############################################################
+
+def blog_key(name='default'):
+    return db.Key.from_path('posts', name)
+
+
+class Post(db.Model):
+    title = db.StringProperty(required=True)
+    body = db.TextProperty(required=True)
+    author_id = db.IntegerProperty(required=True)
+    created = db.DateTimeProperty(auto_now_add=True)
+    modified = db.DateTimeProperty(auto_now=True)
+
+
+    @classmethod
+    def by_id(cls, uid):
+        return Post.get_by_id(pid, parent=blog_key())
+
+############################################################
+############################################################
+
+
+#   _____                                     _
+#  / ____|                                   | |
+# | |     ___  _ __ ___  _ __ ___   ___ _ __ | |_
+# | |    / _ \| '_ ` _ \| '_ ` _ \ / _ \ '_ \| __|
+# | |___| (_) | | | | | | | | | | |  __/ | | | |_
+#  \_____\___/|_| |_| |_|_| |_| |_|\___|_| |_|\__|
+############################################################
+
+class Comment(db.Model):
+    author_id = db.IntegerProperty(required=True)
+    post_id = db.IntegerProperty(required=True)
+    comment = db.TextProperty(required=True)
+    created = db.DateTimeProperty(auto_now_add=True)
+    modified = db.DateTimeProperty(auto_now=True)
+
+    @classmethod
+    def by_id(cls, cid):
+        return Comment.get_by_id(cid, parent=blog_key())
