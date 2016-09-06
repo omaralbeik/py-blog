@@ -3,13 +3,11 @@ import re
 import random
 import hashlib
 import hmac
+import time
 from string import letters
 
 import webapp2
 import jinja2
-
-import time
-
 from google.appengine.ext import db
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
@@ -24,22 +22,28 @@ EMAIL_RE  = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
 
 
 def valid_username(username):
+    """Return true if username is in valid format"""
     return username and USER_RE.match(username)
 
 def valid_password(password):
+    """Return true if password is in valid format"""
     return password and PASS_RE.match(password)
 
 def valid_email(email):
+    """Return true if email is in valid format"""
     return not email or EMAIL_RE.match(email)
 
 def render_str(template, **params):
+    """Render a template with parameters"""
     t = jinja_env.get_template(template)
     return t.render(params)
 
 def make_secure_val(val):
+    """Return hased version of value"""
     return '%s|%s' % (val, hmac.new(SECRET, val).hexdigest())
 
 def check_secure_val(secure_val):
+    """Return nomal value from its hashed version"""
     val = secure_val.split('|')[0]
     if secure_val == make_secure_val(val):
         return val
@@ -56,19 +60,23 @@ class BlogHandler(webapp2.RequestHandler):
         self.write(self.render_str(template, **kw))
 
     def set_secure_cookie(self, name, val):
+        """Save a cookie securely"""
         cookie_val = make_secure_val(val)
         self.response.headers.add_header(
             'Set-Cookie',
             '%s=%s; Path=/' % (name, cookie_val))
 
     def read_secure_cookie(self, name):
+        """Read a hashed cookie"""
         cookie_val = self.request.cookies.get(name)
         return cookie_val and check_secure_val(cookie_val)
 
     def login(self, user):
+        """Save user id in a secure cookie"""
         self.set_secure_cookie('user_id', str(user.key().id()))
 
     def logout(self):
+        """Delete user id cookie"""
         self.response.headers.add_header('Set-Cookie', 'user_id=; Path=/')
 
     def initialize(self, *a, **kw):
@@ -78,6 +86,7 @@ class BlogHandler(webapp2.RequestHandler):
         self.user = uid and User.by_id(int(uid))
 
 def render_post(response, post):
+    """Render a post"""
     response.out.write('<b>' + post.subject + '</b><br>')
     response.out.write(post.content)
 
@@ -86,17 +95,19 @@ class MainPage(BlogHandler):
       self.redirect('/blog')
 
 
-##### user stuff
 def make_salt(length = 5):
+    """Make a salt of lenght"""
     return ''.join(random.choice(letters) for x in xrange(length))
 
 def make_pw_hash(name, pw, salt = None):
+    """Hash a password"""
     if not salt:
         salt = make_salt()
     h = hashlib.sha256(name + pw + salt).hexdigest()
     return '%s,%s' % (salt, h)
 
 def valid_pw(name, password, h):
+    """Check if password is valid for a username"""
     salt = h.split(',')[0]
     return h == make_pw_hash(name, password, salt)
 
@@ -110,15 +121,18 @@ class User(db.Model):
 
     @classmethod
     def by_id(cls, uid):
+        """Get user by id"""
         return User.get_by_id(uid, parent = users_key())
 
     @classmethod
     def by_name(cls, name):
+        """Get user by name"""
         u = User.all().filter('name =', name).get()
         return u
 
     @classmethod
     def register(cls, name, pw, email = None):
+        """Register a new user"""
         pw_hash = make_pw_hash(name, pw)
         return User(parent = users_key(),
                     name = name,
@@ -127,12 +141,12 @@ class User(db.Model):
 
     @classmethod
     def login(cls, name, pw):
+        """Login with username and a password"""
         u = cls.by_name(name)
         if u and valid_pw(name, pw, u.pw_hash):
             return u
 
 
-##### blog stuff
 def blog_key(name = 'default'):
     return db.Key.from_path('blogs', name)
 
@@ -146,6 +160,7 @@ class Post(db.Model):
 
     @classmethod
     def by_id(cls, pid):
+        """Get post by id"""
         return Post.get_by_id(pid, parent=blog_key())
 
     def render(self, user, permalink):
@@ -164,6 +179,7 @@ class Comment(db.Model):
 
     @classmethod
     def by_id(cls, pid):
+        """Get comment by id"""
         return Comment.get_by_id(pid, parent=blog_key())
 
     def render(self, user):
@@ -287,7 +303,7 @@ class DeletePost(BlogHandler):
             self.redirect("/blog")
 
         post.delete()
-        time.sleep(0.1)
+        time.sleep(0.25)
         self.redirect('/blog')
 
 class NewComment(BlogHandler):
@@ -372,7 +388,7 @@ class DeleteComment(BlogHandler):
                 self.redirect("/blog")
 
         comment.delete()
-        time.sleep(0.1)
+        time.sleep(0.25)
         self.redirect('/blog/%s' % str(comment.post_id))
 
 
@@ -391,7 +407,7 @@ class Like(BlogHandler):
             if uid != item.author_id and uid not in item.liked:
                 item.liked.append(uid)
                 item.put()
-                time.sleep(0.1)
+                time.sleep(0.25)
 
             if self.request.get('permalink') == 'True':
                 self.redirect('/blog/%s' % str(post_id))
@@ -417,7 +433,7 @@ class Dislike(BlogHandler):
             if uid in item.liked:
                 item.liked.remove(uid)
                 item.put()
-                time.sleep(0.1)
+                time.sleep(0.25)
 
             if self.request.get('permalink') == 'True':
                 self.redirect('/blog/%s' % str(post_id))
