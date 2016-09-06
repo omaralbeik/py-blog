@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {{post.render(user, False) | safe}}
+
+  {% if user %}
+    <br><br>
+    <form class="new-comment-form" action="/blog/newcomment" method="post">
+      <label>
+        <div>Leave a comment:</div>
+        <textarea name="content">{{content}}</textarea>
+        <input type="hidden" name="post_id" value="{{post.key().id()}}">
+      </label>
+
+      <div class="error">{{error}}</div>
+
+      <input type="submit">
+    </form>
+  {% endif %}
+
+  <br><br>
+  {% if comments.count() %}
+    <h2 class="comment-header">Comments</h2>
+    {% for comment in comments %}
+      {{comment.render(user) | safe}}
+      <br><br>
+    {% endfor %}
+  {% endif %}
+{% endblock %}

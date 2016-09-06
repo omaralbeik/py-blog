@@ -1,0 +1,34 @@
+<div class="post">
+  <div class="post-heading">
+    <div class="post-title">
+        {% if permalink %}
+            <a href="/blog/{{p.key().id()}}">{{p.subject}}</a>
+        {% else %}
+          {{p.subject}}
+        {% endif %}
+    </div>
+
+    <div class="post-date">
+      {% if user %}
+        {% if permalink %}
+          <a href="/blog/{{p.key().id()}}">Comment</a> -
+        {% endif %}
+        {% if user.key().id() == p.author_id %}
+          <a href="/blog/editpost?post_id={{p.key().id()}}">Edit</a>
+          <a href="/blog/deletepost?post_id={{p.key().id()}}">Delete</a>
+        {% else %}
+          {% if user.key().id() not in p.liked %}
+            <a href="/blog/like?post_id={{p.key().id()}}&amp;permalink={{ not permalink }}">Like</a>
+          {% else %}
+            <a href="/blog/dislike?post_id={{p.key().id()}}&amp;permalink={{ not permalink }}">Dislike</a>
+          {% endif %}
+        {% endif %}
+      {% endif %}
+      ({{p.liked_count}} likes) - {{p.created.strftime("%b %d, %Y")}} by {{ author.name }}
+    </div>
+  </div>
+
+  <div class="post-content">
+    {{p._render_text | safe}}
+  </div>
+</div>
