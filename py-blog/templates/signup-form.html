@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% extends "base.html" %}
 
 <html>
   <head>
@@ -11,6 +11,7 @@
   </head>
 
   <body>
+    {% block content %}
     <h2>Signup</h2>
     <form method="post">
       <table>
@@ -63,8 +64,9 @@
         </tr>
       </table>
 
-      <input type="submit">
+      <input type="submit" value="Sign Up"> or <a href="/login">Login</a>
     </form>
+    {% endblock %}
   </body>
 
 </html>
