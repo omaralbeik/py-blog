@@ -1,72 +1,66 @@
 {% extends "base.html" %}
 
-<html>
-  <head>
-    <title>Sign Up</title>
-    <style type="text/css">
-      .label {text-align: right}
-      .error {color: red}
-    </style>
+{% block content %}
+<h2>Signup</h2>
+<form method="post">
+  <table>
+    <tr>
+      <td class="label">
+        Username
+      </td>
+      <td>
+        <input type="text" name="username" value="{{username}}">
+      </td>
+      {% if 'username_err' in errors  %}
+      <td class="error">
+        {{errors['username_err']}}
+      </td>
+      {% endif %}
+    </tr>
 
-  </head>
+    <tr>
+      <td class="label">
+        Password
+      </td>
+      <td>
+        <input type="password" name="pw" value="">
+      </td>
+      {% if 'pw_err' in errors  %}
+      <td class="error">
+        {{errors['pw_err']}}
+      </td>
+      {% endif %}
+    </tr>
 
-  <body>
-    {% block content %}
-    <h2>Signup</h2>
-    <form method="post">
-      <table>
-        <tr>
-          <td class="label">
-            Username
-          </td>
-          <td>
-            <input type="text" name="username" value="{{username}}">
-          </td>
-          <td class="error">
-            {{error_username}}
-          </td>
-        </tr>
+    <tr>
+      <td class="label">
+        Verify Password
+      </td>
+      <td>
+        <input type="password" name="pw_conf" value="">
+      </td>
+      {% if 'pw_conf_err' in errors  %}
+      <td class="error">
+        {{errors['pw_conf_err']}}
+      </td>
+      {% endif %}
+    </tr>
 
-        <tr>
-          <td class="label">
-            Password
-          </td>
-          <td>
-            <input type="password" name="password" value="">
-          </td>
-          <td class="error">
-            {{error_password}}
-          </td>
-        </tr>
+    <tr>
+      <td class="label">
+        Email (optional)
+      </td>
+      <td>
+        <input type="email" name="email" value="{{email}}">
+      </td>
+      {% if 'email_err' in errors  %}
+      <td class="error">
+        {{errors['email_err']}}
+      </td>
+      {% endif %}
+    </tr>
+  </table>
 
-        <tr>
-          <td class="label">
-            Verify Password
-          </td>
-          <td>
-            <input type="password" name="verify" value="">
-          </td>
-          <td class="error">
-            {{error_verify}}
-          </td>
-        </tr>
-
-        <tr>
-          <td class="label">
-            Email (optional)
-          </td>
-          <td>
-            <input type="text" name="email" value="{{email}}">
-          </td>
-          <td class="error">
-            {{error_email}}
-          </td>
-        </tr>
-      </table>
-
-      <input type="submit" value="Sign Up"> or <a href="/login">Login</a>
-    </form>
-    {% endblock %}
-  </body>
-
-</html>
+  <input type="submit" value="Sign Up"> or <a href="/login">Login</a>
+</form>
+{% endblock %}
