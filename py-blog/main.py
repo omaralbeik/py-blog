@@ -79,10 +79,8 @@ class PostHandler(BlogHandler):
             self.error(404)
             return
 
-        comments = Comment.all().filter(
-            'post_id =', int(post_id)).order('created')
-
-        self.render_permalink(post, comments)
+        comments = Comment.all().filter('post_id =', int(post_id)).order('created')
+        self.render_permalink(post=post, comments=comments)
 
 
 class NewPostHandler(BlogHandler):
