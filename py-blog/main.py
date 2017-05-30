@@ -92,7 +92,8 @@ class NewPostHandler(BlogHandler):
 
     def post(self):
         if not self.user:
-            self.redirect_blog()
+            self.render_login()
+            return
 
         subject = self.request.get('subject')
         content = self.request.get('content')
@@ -115,30 +116,38 @@ class BlogFrontHandler(BlogHandler):
 
 class EditPostHandler(BlogHandler):
     def get(self):
-        if self.user:
-            post_id = int(self.request.get('post_id'))
-            post = Post.by_id(post_id)
-
-            if not post:
-                self.error(404)
-                return
-
-            if post.author_id != self.user.key().id():
-                self.redirect_blog()
-
-            self.render_edit_post(post)
-        else:
-            self.redirect_login()
-
-    def post(self):
         if not self.user:
-            self.redirect_blog()
+            self.redirect_login()
+            return
 
         post_id = int(self.request.get('post_id'))
         post = Post.by_id(post_id)
 
+        if not post:
+            self.error(404)
+            return
+
         if post.author_id != self.user.key().id():
-                self.redirect_blog()
+            self.redirect_login()
+            return
+
+        self.render_edit_post(post)
+
+    def post(self):
+        if not self.user:
+            self.redirect_login()
+            return
+
+        post_id = int(self.request.get('post_id'))
+        post = Post.by_id(post_id)
+
+        if not post:
+            self.error(404)
+            return
+
+        if post.author_id != self.user.key().id():
+            self.redirect_login()
+            return
 
         subject = self.request.get('subject')
         content = self.request.get('content')
@@ -146,7 +155,6 @@ class EditPostHandler(BlogHandler):
         if subject and content:
             post.subject = subject
             post.content = content
-
             post.put()
             self.redirect_post(post.key().id())
         else:
@@ -156,30 +164,38 @@ class EditPostHandler(BlogHandler):
 
 class DeletePostHandler(BlogHandler):
     def get(self):
-        if self.user:
-            post_id = int(self.request.get('post_id'))
-            post = Post.by_id(post_id)
-
-            if not post:
-                self.error(404)
-                return
-
-            if post.author_id != self.user.key().id():
-                self.redirect_blog()
-
-            self.render_delete_post(post)
-        else:
-            self.redirect_login()
-
-    def post(self):
         if not self.user:
-            self.redirect_blog()
+            self.redirect_login()
+            return
 
         post_id = int(self.request.get('post_id'))
         post = Post.by_id(post_id)
 
+        if not post:
+            self.error(404)
+            return
+
         if post.author_id != self.user.key().id():
-            self.redirect_blog()
+            self.redirect_login()
+            return
+
+        self.render_delete_post(post)
+
+    def post(self):
+        if not self.user:
+            self.redirect_login()
+            return
+
+        post_id = int(self.request.get('post_id'))
+        post = Post.by_id(post_id)
+
+        if not post:
+            self.error(404)
+            return
+
+        if post.author_id != self.user.key().id():
+            self.redirect_login()
+            return
 
         post.delete()
         time.sleep(0.25)
@@ -189,82 +205,109 @@ class DeletePostHandler(BlogHandler):
 class NewCommentHandler(BlogHandler):
     def post(self):
         if not self.user:
-            self.redirect_blog()
+            self.redirect_login()
+            return
 
         post_id = int(self.request.get('post_id'))
-        content = self.request.get('content')
+        content = self.request.get('content').strip()
+        post = Post.by_id(post_id)
 
-        if post_id and content:
-            c = Comment(parent=blog_key(), post_id=post_id, content=content,
-                        author_id=self.user.key().id())
-            c.put()
+        if not post:
+            self.error(404)
+            return
+
+        if not content:
+            comments = Comment.all().filter('post_id =', int(post_id)).order('created')
+            self.render_permalink(post=post, comments=comments,
+                                  error="Please enter a comment text")
+            return
+
+        c = Comment(parent=blog_key(), post_id=post_id, content=content,
+                    author_id=self.user.key().id())
+        c.put()
         self.redirect_post(post_id)
 
 
 class EditCommentHandler(BlogHandler):
     def get(self):
-        if self.user:
-            comment_id = int(self.request.get('comment_id'))
-            comment = Comment.by_id(comment_id)
-
-            if not comment:
-                self.error(404)
-                return
-
-            if comment.author_id != self.user.key().id():
-                self.redirect("/blog")
-
-            self.render_edit_comment(comment)
-        else:
-            self.redirect_blog()
-
-    def post(self):
         if not self.user:
-            self.redirect_blog()
+            self.redirect_login()
+            return
 
         comment_id = int(self.request.get('comment_id'))
         comment = Comment.by_id(comment_id)
 
+        if not comment:
+            self.error(404)
+            return
+
         if comment.author_id != self.user.key().id():
-            self.redirect_blog()
+            self.redirect_login()
+            return
 
-        content = self.request.get('content')
+        self.render_edit_comment(comment)
 
-        if content:
-            comment.content = content
-            comment.put()
-            self.redirect_post(comment.post_id)
-        else:
-            error = "content, please!"
-            self.render_edit_comment(comment, error)
+
+    def post(self):
+        if not self.user:
+            self.redirect_login()
+            return
+
+        comment_id = int(self.request.get('comment_id'))
+        comment = Comment.by_id(comment_id)
+
+        if not comment:
+            self.error(404)
+            return
+
+        if comment.author_id != self.user.key().id():
+            self.redirect_login()
+            return
+
+        content = self.request.get('content').strip()
+
+        if not content:
+            self.render_edit_comment(comment, error="Please enter a comment text")
+            return
+
+        comment.content = content
+        comment.put()
+        self.redirect_post(comment.post_id)
 
 
 class DeleteCommentHandler(BlogHandler):
     def get(self):
-        if self.user:
-            comment_id = int(self.request.get('comment_id'))
-            comment = Comment.by_id(comment_id)
-
-            if not comment:
-                self.error(404)
-                return
-
-            if comment.author_id != self.user.key().id():
-                self.redirect_blog()
-
-            self.render_delete_comment(comment)
-        else:
-            self.redirect_login()
-
-    def post(self):
         if not self.user:
-            self.redirect_blog()
+            self.redirect_login()
+            return
 
         comment_id = int(self.request.get('comment_id'))
         comment = Comment.by_id(comment_id)
 
+        if not comment:
+            self.error(404)
+            return
+
         if comment.author_id != self.user.key().id():
-                self.redirect_blog()
+            self.redirect_login()
+            return
+
+        self.render_delete_comment(comment)
+
+    def post(self):
+        if not self.user:
+            self.redirect_login()
+
+        comment_id = int(self.request.get('comment_id'))
+        comment = Comment.by_id(comment_id)
+
+        if not comment:
+            self.error(404)
+            return
+
+        if comment.author_id != self.user.key().id():
+            self.redirect_login()
+            return
 
         comment.delete()
         time.sleep(0.25)
@@ -273,53 +316,77 @@ class DeleteCommentHandler(BlogHandler):
 
 class LikeHandler(BlogHandler):
     def get(self):
-        if self.user:
-            if self.request.get('post_id'):
-                item_id = post_id = int(self.request.get('post_id'))
-                item = Post.by_id(item_id)
-            elif self.request.get('comment_id'):
-                item_id = int(self.request.get('comment_id'))
-                item = Comment.by_id(item_id)
-                post_id = item.post_id
+        if not self.user:
+            self.redirect_login()
 
-            uid = self.user.key().id()
-            if uid != item.author_id and uid not in item.liked:
-                item.liked.append(uid)
-                item.put()
-                time.sleep(0.25)
-
-            if self.request.get('permalink') == 'True':
-                self.redirect_post(post_id)
-            else:
+        if self.request.get('post_id'):
+            item_id = post_id = int(self.request.get('post_id'))
+            item = Post.by_id(item_id)
+            if not item:
                 self.redirect_blog()
+                return
+
+        elif self.request.get('comment_id'):
+            item_id = int(self.request.get('comment_id'))
+            item = Comment.by_id(item_id)
+            post_id = item.post_id
+            if not item:
+                self.redirect_blog()
+                return
 
         else:
-            self.redirect_login()
+            self.redirect_blog()
+            return
+
+        uid = self.user.key().id()
+        if uid != item.author_id and uid not in item.liked:
+            item.liked.append(uid)
+            item.put()
+            time.sleep(0.25)
+            if self.request.get('permalink') == 'True':
+                self.redirect_post(post_id)
+
+        else:
+            self.redirect_blog()
 
 
 class DislikeHandler(BlogHandler):
     def get(self):
-        if self.user:
-            if self.request.get('post_id'):
-                item_id = post_id = int(self.request.get('post_id'))
-                item = Post.by_id(item_id)
-            elif self.request.get('comment_id'):
-                item_id = int(self.request.get('comment_id'))
-                item = Comment.by_id(item_id)
-                post_id = item.post_id
+        if not self.user:
+            self.redirect_login()
+            return
 
-            uid = self.user.key().id()
-            if uid in item.liked:
-                item.liked.remove(uid)
-                item.put()
-                time.sleep(0.25)
+        if self.request.get('post_id'):
+            item_id = post_id = int(self.request.get('post_id'))
+            item = Post.by_id(item_id)
+            if not item:
+                self.redirect_blog()
+                return
+
+        elif self.request.get('comment_id'):
+            item_id = int(self.request.get('comment_id'))
+            item = Comment.by_id(item_id)
+            post_id = item.post_id
+            if not item:
+                self.redirect_blog()
+                return
+
+        else:
+            self.redirect_blog()
+            return
+
+        uid = self.user.key().id()
+        if uid in item.liked:
+            item.liked.remove(uid)
+            item.put()
+            time.sleep(0.25)
 
             if self.request.get('permalink') == 'True':
                 self.redirect_post(post_id)
-            else:
-                self.redirect_blog()
+
         else:
-            self.redirect_login()
+            self.redirect_blog()
+
 
 
 class LogoutHandler(BlogHandler):

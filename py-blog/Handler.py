@@ -50,8 +50,8 @@ class BlogHandler(webapp2.RequestHandler):
         self.render('signup-form.html', username=username,
                                         email=email, errors = errors)
 
-    def render_permalink(self, post, comments):
-        self.render("permalink.html", post=post, comments=comments)
+    def render_permalink(self, post, comments, error=""):
+        self.render("permalink.html", post=post, comments=comments, error=error)
 
     def render_new_post(self, subject="", content="", error=""):
         self.render("newpost.html", subject=subject, content=content,
